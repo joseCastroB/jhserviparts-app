@@ -75,3 +75,27 @@ export const getProducts = async (uid: number, password: string) => {
     throw error;
   }
 };
+
+// 3. Obtener Solicitudes de Mantenimiento
+export const getMaintenanceRequests = async (uid: number, password: string) => {
+    try{
+        const requests = await rpcCall('object', 'execute_kw',[
+            ODOO_CONFIG.db,
+            uid,
+            password,
+            'maintenance.request', // Modelo Odoo
+            'search_read',
+            [], // Traer todas las solicitudes
+            {
+                fields: ['name', 'request_date', 'stage_id', 'priority'],
+                limit: 20,
+                order: 'id desc' // las mas recientes primero
+            },
+        ]);
+
+        return requests;
+    } catch (error){
+        console.error('Error Maintenance:', error);
+        throw error;
+    }
+};

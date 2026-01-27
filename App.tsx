@@ -1,17 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
+import { MaintenanceScreen } from './src/screens/MaintenanceScreen';
 
 function App(): React.JSX.Element {
-  const [session, setSession] = useState<{uid: number, user: string, pass: string} | null>(null);
+  const [session, setSession] = useState<{ uid: number, user: string, pass: string } | null>(null);
+
+  // Estado para saber en qué pantalla estamos: 'dashboard' | 'mantenimiento'
+  const [currentModule, setCurrentModule] = useState<'dashboard' | 'mantenimiento'>('dashboard');
 
   // Manejo de clics en el menú
   const handleModulePress = (moduleName: string) => {
     if (moduleName === 'Mantenimiento') {
-      // AQUÍ IRÁ LA NAVEGACIÓN A LA PANTALLA DE MANTENIMIENTO
-      Alert.alert('Navegando', 'Abriendo módulo de Mantenimiento...');
+      setCurrentModule('mantenimiento');
+    } else {
+      Alert.alert('Proximamente', `El módulo ${moduleName} aún no está listo.`)
     }
   };
 
@@ -19,25 +24,42 @@ function App(): React.JSX.Element {
   if (!session) {
     return (
       <SafeAreaProvider>
-        <LoginScreen 
-          onLoginSuccess={(uid, user, pass) => setSession({ uid, user, pass })} 
+        <LoginScreen
+          onLoginSuccess={(uid, user, pass) => setSession({ uid, user, pass })}
         />
       </SafeAreaProvider>
     );
   }
 
-  // 2. Si HAY sesión -> Dashboard
+
+  // 2. Mantenimiento
+  if (currentModule === 'mantenimiento') {
+    return (
+      <SafeAreaProvider>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#EFF0F4' }}>
+          <MaintenanceScreen
+            session={session}
+            onBack={() => setCurrentModule('dashboard')} // Volver al menú
+          />
+        </SafeAreaView>
+      </SafeAreaProvider>
+    );
+  }
+
+  // 3. Si HAY sesión -> Dashboard
   return (
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: '#EFF0F4' }}>
-        <DashboardScreen 
-          username={session.user} 
+        <DashboardScreen
+          username={session.user}
           onLogout={() => setSession(null)}
           onModulePress={handleModulePress}
         />
       </SafeAreaView>
     </SafeAreaProvider>
   );
+
+
 }
 
 export default App;

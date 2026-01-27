@@ -37,7 +37,7 @@ export const LoginScreen = ({ onLoginSuccess }: LoginProps) => {
     return (
 
         <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.container}
         >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -78,7 +78,7 @@ export const LoginScreen = ({ onLoginSuccess }: LoginProps) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#f5f5f5' },
-    scrollContainer: { flexGrow: 1, justifyContent: 'center', //Centra el contenido verticalmente
+    scrollContainer: { flexGrow: 1, paddingTop: 60, paddingBottom: 200, 
     },
     title: { fontSize: 24, fontWeight: 'bold', marginBottom: 30, textAlign: 'center', color: '#333' },
     label: { fontSize: 16, marginBottom: 5, color: '#333' },
