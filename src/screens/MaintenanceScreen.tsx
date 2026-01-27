@@ -5,9 +5,10 @@ import { getMaintenanceRequests } from '../services/odoo';
 interface MaintenanceProps {
     session: { uid: number, user: string, pass: string };
     onBack: () => void; // Para volver al Dashboard
+    onCreate: () => void; // Para ir a la pantalla de creación
 }
 
-export const MaintenanceScreen = ({ session, onBack }: MaintenanceProps) => {
+export const MaintenanceScreen = ({ session, onBack, onCreate }: MaintenanceProps) => {
     const [requests, setRequests] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -60,7 +61,7 @@ export const MaintenanceScreen = ({ session, onBack }: MaintenanceProps) => {
                 <Text style={styles.sectionTitle}>Solicitudes</Text>
                 <TouchableOpacity
                     style={styles.newButton}
-                    onPress={() => Alert.alert('Próximamente', 'Aquí abriremos el formulario de creación')}
+                    onPress={onCreate}
                 >
                     <Text style={styles.newButtonText}>NUEVO</Text>
                 </TouchableOpacity>

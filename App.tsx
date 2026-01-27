@@ -4,12 +4,13 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { MaintenanceScreen } from './src/screens/MaintenanceScreen';
+import { MaintenanceCreateScreen } from './src/screens/MaintenanceCreateScreen';
 
 function App(): React.JSX.Element {
   const [session, setSession] = useState<{ uid: number, user: string, pass: string } | null>(null);
 
   // Estado para saber en qué pantalla estamos: 'dashboard' | 'mantenimiento'
-  const [currentModule, setCurrentModule] = useState<'dashboard' | 'mantenimiento'>('dashboard');
+  const [currentModule, setCurrentModule] = useState<'dashboard' | 'mantenimiento' | 'maintenance_create'>('dashboard');
 
   // Manejo de clics en el menú
   const handleModulePress = (moduleName: string) => {
@@ -31,8 +32,22 @@ function App(): React.JSX.Element {
     );
   }
 
+  // 2. Crear solicitud mantenimiento
+  if (currentModule === 'maintenance_create') {
+    return (
+      <SafeAreaProvider>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#EFF0F4' }}>
+          <MaintenanceCreateScreen
+            session={session}
+            onBack={() => setCurrentModule('mantenimiento')} // Botón cancelar
+            onSuccess={() => setCurrentModule('mantenimiento')} // Al guardar, vuelve a la lista
+          />
+        </SafeAreaView>
+      </SafeAreaProvider>
+    );
+  }
 
-  // 2. Mantenimiento
+  // 3. Mantenimiento
   if (currentModule === 'mantenimiento') {
     return (
       <SafeAreaProvider>
@@ -40,13 +55,14 @@ function App(): React.JSX.Element {
           <MaintenanceScreen
             session={session}
             onBack={() => setCurrentModule('dashboard')} // Volver al menú
+            onCreate={() => setCurrentModule('maintenance_create')}
           />
         </SafeAreaView>
       </SafeAreaProvider>
     );
   }
 
-  // 3. Si HAY sesión -> Dashboard
+  // 4. Si HAY sesión -> Dashboard
   return (
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: '#EFF0F4' }}>

@@ -99,3 +99,27 @@ export const getMaintenanceRequests = async (uid: number, password: string) => {
         throw error;
     }
 };
+
+// 4. Crear nueva solicitud de mantenimiento
+export const createMaintenanceRequest = async (
+    uid: number,
+    password: string,
+    data: { name: string; maintenance_type: 'corrective' | 'preventive'; description?: string}
+) => {
+    try {
+        const newId = await rpcCall('object', 'execute_kw', [
+            ODOO_CONFIG.db,
+            uid,
+            password,
+            'maintenance.request', // Modelo
+            'create', // Método para crear
+            [data], // Los datos a guardar
+        ]);
+
+        console.log('✅ Solicitud creada con ID:', newId);
+        return newId;
+    }catch(error){
+        console.error('Error Creating Request:', error);
+        throw error;
+    }
+};
