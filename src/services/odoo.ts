@@ -3,8 +3,6 @@
 const ODOO_CONFIG = {
     url: 'https://jh-serviparts.tic-odoo.com', // Ojo: Sin el / al final
     db: 'jh-serviparts',
-    username: 'admin',
-    apiKey: '62dbde3b346c4912d948ebdce7c75c8976d961f3',
 };
 
 // Función genérica para hacer peticiones JSON-RPC
@@ -37,17 +35,17 @@ const rpcCall = async (service: string, method: string, args: any[]) => {
 };
 
 // 1. Autenticación (Login)
-export const authenticateOdoo = async (): Promise<number> => {
+export const authenticateOdoo = async (username: string, password: string): Promise<number> => {
   try {
     const uid = await rpcCall('common', 'authenticate', [
       ODOO_CONFIG.db,
-      ODOO_CONFIG.username,
-      ODOO_CONFIG.apiKey,
+      username,
+      password,    
       {},
     ]);
 
     if (!uid) {
-      throw new Error('Credenciales incorrectas');
+      throw new Error('Usuario o contraseña incorrectos');
     }
 
     console.log('✅ Conectado a Odoo! UID:', uid);
@@ -59,16 +57,16 @@ export const authenticateOdoo = async (): Promise<number> => {
 };
 
 // 2. Obtener Productos
-export const getProducts = async (uid: number) => {
+export const getProducts = async (uid: number, password: string) => {
   try {
     const products = await rpcCall('object', 'execute_kw', [
       ODOO_CONFIG.db,
       uid,
-      ODOO_CONFIG.apiKey,
+      password,
       'product.template', // Modelo
       'search_read',      // Método
       [[['type', '=', 'service']]], // Argumentos (Filtro)
-      { fields: ['name', 'list_price'], limit: 5 }, // Kwargs (Opciones)
+      { fields: ['name', 'list_price'], limit: 10 }, // Kwargs (Opciones)
     ]);
     
     return products;
