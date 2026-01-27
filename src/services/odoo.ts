@@ -1,6 +1,6 @@
 
 // Configuracion de Odoo
-const ODOO_CONFIG = {
+export const ODOO_CONFIG = {
     url: 'https://jh-serviparts.tic-odoo.com', // Ojo: Sin el / al final
     db: 'jh-serviparts',
 };
