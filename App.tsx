@@ -1,45 +1,35 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { useEffect, useState } from 'react';
+import { SafeAreaView, Text, Button, View } from 'react-native';
+import { authenticateOdoo, getProducts } from './src/services/odoo';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+function App(): React.JSX.Element {
+  const [status, setStatus] = useState('Desconectado');
+  const [data, setData] = useState('');
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
-  );
-}
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
+  const handleConnect = async () => {
+    try {
+      setStatus('Conectando...');
+      const uid = await authenticateOdoo(); // 1. Autenticar
+      setStatus(`Conectado (UID: ${uid})`);
+      
+      const productos = await getProducts(uid); // 2. Traer datos
+      setData(JSON.stringify(productos, null, 2));
+      
+    } catch (error) {
+      console.error(error);
+      setStatus('Error de conexión');
+    }
+  };
 
   return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
+    <SafeAreaView style={{ padding: 20 }}>
+      <Text style={{ fontSize: 20, marginBottom: 20 }}>Prueba Odoo</Text>
+      <Text>Estado: {status}</Text>
+      <Button title="Conectar a Odoo" onPress={handleConnect} />
+      <Text style={{ marginTop: 20 }}>Datos:</Text>
+      <Text>{data}</Text>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
 
 export default App;
