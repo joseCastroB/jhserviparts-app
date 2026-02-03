@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
   headerTitle: { color: 'white', fontSize: 18, fontWeight: 'bold' },
   headerBtn: { color: 'white', fontSize: 16 },
   headerBtnBold: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  formContainer: { padding: 15, paddingBottom: 50 },
+  formContainer: { padding: 15, paddingBottom: 300 },
   label: { fontSize: 14, color: '#318F9A', fontWeight: 'bold', marginTop: 15, marginBottom: 5 },
   labelSmall: { fontSize: 12, color: '#666', marginBottom: 3, marginTop: 8 },
   sectionHeader: { fontSize: 16, color: '#444', fontWeight: 'bold', marginTop: 20, marginBottom: 5, textTransform: 'uppercase' },
