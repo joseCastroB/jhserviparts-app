@@ -123,3 +123,41 @@ export const createMaintenanceRequest = async (
         throw error;
     }
 };
+
+// 5. Obtener equipos de mantenimiento
+export const getEquipments = async (uid: number, password: string) => {
+  try {
+    const teams = await rpcCall('object', 'execute_kw', [
+      ODOO_CONFIG.db,
+      uid,
+      password, 
+      'maintenance.equipment',
+      'search_read',
+      [],
+      { fields: ['id', 'name'], limit: 50},
+    ]);
+    return teams;
+  } catch (error) {
+    console.error('Error getting teams:', error);
+    return [];
+  }
+};
+
+// 6. Obtener usuarios (Técnicos)
+export const getUsers = async (uid: number, password: string) => {
+  try {
+    const users = await rpcCall('object', 'execute_kw', [
+      ODOO_CONFIG.db,
+      uid,
+      password, 
+      'res.users',
+      'search_read',
+      [],
+      { fields: ['id', 'name'], limit:50 },
+    ]);
+    return users;
+  } catch (error){
+    console.error('Error getting users:', error);
+    return [];
+  }
+};

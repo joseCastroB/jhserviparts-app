@@ -39,8 +39,8 @@ function App(): React.JSX.Element {
         <SafeAreaView style={{ flex: 1, backgroundColor: '#EFF0F4' }}>
           <MaintenanceCreateScreen
             session={session}
-            onBack={() => setCurrentModule('mantenimiento')} // Botón cancelar
-            onSuccess={() => setCurrentModule('mantenimiento')} // Al guardar, vuelve a la lista
+            onBack={() => setCurrentModule('mantenimiento')} 
+            onSuccess={() => setCurrentModule('mantenimiento')} 
           />
         </SafeAreaView>
       </SafeAreaProvider>

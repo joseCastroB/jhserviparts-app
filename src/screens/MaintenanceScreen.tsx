@@ -78,7 +78,7 @@ export const MaintenanceScreen = ({ session, onBack, onCreate }: MaintenanceProp
                     contentContainerStyle={styles.listContainer}
                     ListEmptyComponent={<Text style={styles.emptyText}>No hay solicitudes registradas.</Text>}
                     refreshing={loading}
-                    onRefresh={loadRequests} // "Jalar" para recargar
+                    onRefresh={loadRequests} 
                 />
             )}
         </View>

@@ -10,6 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@react-native-community/datetimepicker": "^8.6.0",
     "@react-native/new-app-screen": "0.83.1",
     "assert": "^2.1.0",
     "buffer": "^6.0.3",
@@ -18,7 +19,10 @@
     "process": "^0.11.10",
     "react": "19.2.0",
     "react-native": "0.83.1",
+    "react-native-image-picker": "^8.2.1",
     "react-native-safe-area-context": "^5.5.2",
+    "react-native-signature-canvas": "^5.0.2",
+    "react-native-webview": "^13.16.0",
     "stream-browserify": "^3.0.0",
     "stream-http": "^3.2.0",
     "url": "^0.11.4",
