@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { getMaintenanceRequests } from '../services/odoo';
 
 interface MaintenanceProps {
@@ -11,6 +11,9 @@ interface MaintenanceProps {
 export const MaintenanceScreen = ({ session, onBack, onCreate }: MaintenanceProps) => {
     const [requests, setRequests] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    
+    //Estado para el buscador
+    const [searchQuery, setSearchQuery] = useState('');
 
     //Cargar datos al abrir la pantalla
     useEffect(() => {
@@ -28,6 +31,16 @@ export const MaintenanceScreen = ({ session, onBack, onCreate }: MaintenanceProp
             setLoading(false);
         }
     };
+
+    // Lógica de filtrado 
+    const filteredRequests = requests.filter(item =>{
+        const searchText = searchQuery.toLowerCase();
+        const name = item.name ? item.name.toLowerCase() : '';
+        const stage = Array.isArray(item.stage_id) ? item.stage_id[1].toLowerCase() : '';
+
+        return name.includes(searchText) || stage.includes(searchText)  
+    })
+
 
     // Diseño de cada tarjeta (Solicitud)
     const renderItem = ({ item }: { item: any }) => (
@@ -67,16 +80,32 @@ export const MaintenanceScreen = ({ session, onBack, onCreate }: MaintenanceProp
                 </TouchableOpacity>
             </View>
 
+            {/* Buscador */}
+            <View style={styles.searchContainer}>
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="🔍 Buscar solicitud..."
+                    placeholderTextColor= "#999"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    clearButtonMode="while-editing"
+                />
+            </View>
+
             {/* --- Lista de Solicitudes --- */}
             {loading ? (
                 <ActivityIndicator size="large" color="#318F9A" style={{ marginTop: 20 }} />
             ) : (
                 <FlatList
-                    data={requests}
+                    data={filteredRequests}
                     renderItem={renderItem}
                     keyExtractor={(item) => item.id.toString()}
                     contentContainerStyle={styles.listContainer}
-                    ListEmptyComponent={<Text style={styles.emptyText}>No hay solicitudes registradas.</Text>}
+                    ListEmptyComponent={
+                        <Text style={styles.emptyText}>
+                            {searchQuery ? 'No se encontraron resultados.' : 'No hay solicitudes registradas.'}
+                        </Text>
+                    }
                     refreshing={loading}
                     onRefresh={loadRequests} 
                 />
@@ -94,7 +123,7 @@ const styles = StyleSheet.create({
     headerTitle: { color: 'white', fontSize: 18, fontWeight: 'bold' },
     backButton: { padding: 5 },
     backText: { color: 'white', fontSize: 16 },
-
+    
     actionRow: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         padding: 15, paddingBottom: 5
@@ -102,6 +131,23 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#444' },
     newButton: { backgroundColor: '#318F9A', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 5 },
     newButtonText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+
+    searchContainer:{
+        paddingHorizontal: 15,
+        paddingBottom: 10,
+    },
+
+    searchInput:{
+        backgroundColor: 'white',
+        borderRadius: 8,
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        fontSize: 16,
+        color: '#333',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        elevation: 1,
+    },
 
     listContainer: { padding: 10 },
     card: {
