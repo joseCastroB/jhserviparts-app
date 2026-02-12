@@ -1,7 +1,7 @@
 // src/screens/LoginScreen.tsx
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableWithoutFeedback, Keyboard, Image } from 'react-native';
-import { authenticateOdoo } from '../services/odoo';
+import { authenticate } from '../services/odoo';
 
 // Definimos las "props" que recibirá esta pantalla"
 interface LoginProps {
@@ -22,7 +22,7 @@ export const LoginScreen = ({ onLoginSuccess }: LoginProps) => {
         setLoading(true);
         try {
             // Llamamos al servicio con los datos REALES del formulario
-            const uid = await authenticateOdoo(email, password);
+            const uid = await authenticate(email, password);
 
             // Si pasa, avisamos a App.tsx que guarde los datos
             onLoginSuccess(uid, email, password);
