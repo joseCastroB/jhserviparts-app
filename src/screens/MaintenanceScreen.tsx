@@ -6,14 +6,18 @@ interface MaintenanceProps {
     session: { uid: number, user: string, pass: string };
     onBack: () => void; // Para volver al Dashboard
     onCreate: () => void; // Para ir a la pantalla de creación
+    onEdit: (requestId: number) => void;
 }
 
-export const MaintenanceScreen = ({ session, onBack, onCreate }: MaintenanceProps) => {
+export const MaintenanceScreen = ({ session, onBack, onCreate, onEdit }: MaintenanceProps) => {
     const [requests, setRequests] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    
     //Estado para el buscador
     const [searchQuery, setSearchQuery] = useState('');
+    // Lista de usuarios que pueden crear solicitudes
+    const allowedUsers = ['admin', 'juan.zegarra@jhserviparts.com'];
+    // Verificamos si el usuario actual está en la lista (ignorando mayúsculas/minúsculas por seguridad)
+    const canCreate = allowedUsers.includes(session.user.toLowerCase());
 
     //Cargar datos al abrir la pantalla
     useEffect(() => {
@@ -44,18 +48,20 @@ export const MaintenanceScreen = ({ session, onBack, onCreate }: MaintenanceProp
 
     // Diseño de cada tarjeta (Solicitud)
     const renderItem = ({ item }: { item: any }) => (
-        <View style={styles.card}>
-            <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{item.name}</Text>
-                {/* Mostramos la etapa (Ej: Nueva solicitud, En progreso) */}
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
-                        {Array.isArray(item.stage_id) ? item.stage_id[1] : 'Borrador'}
-                    </Text>
+        <TouchableOpacity onPress={() => onEdit(item.id)} activeOpacity={0.7}>
+            <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                    <Text style={styles.cardTitle}>{item.name}</Text>
+                    {/* Mostramos la etapa (Ej: Nueva solicitud, En progreso) */}
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>
+                            {Array.isArray(item.stage_id) ? item.stage_id[1] : 'Borrador'}
+                        </Text>
+                    </View>
                 </View>
+                <Text style={styles.dateText}>Fecha: {item.request_date || 'Sin fecha'}</Text>
             </View>
-            <Text style={styles.dateText}>Fecha: {item.request_date || 'Sin fecha'}</Text>
-        </View>
+        </TouchableOpacity>
     );
 
     return (
@@ -72,12 +78,11 @@ export const MaintenanceScreen = ({ session, onBack, onCreate }: MaintenanceProp
             {/* --- Botón NUEVO y Título --- */}
             <View style={styles.actionRow}>
                 <Text style={styles.sectionTitle}>Solicitudes</Text>
-                <TouchableOpacity
-                    style={styles.newButton}
-                    onPress={onCreate}
-                >
-                    <Text style={styles.newButtonText}>NUEVO</Text>
-                </TouchableOpacity>
+                {canCreate && (
+                    <TouchableOpacity style={styles.newButton} onPress={onCreate}>
+                        <Text style={styles.newButtonText}>NUEVO</Text>
+                    </TouchableOpacity>
+                )}
             </View>
 
             {/* Buscador */}

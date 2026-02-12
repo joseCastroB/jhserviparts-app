@@ -5,12 +5,16 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { MaintenanceScreen } from './src/screens/MaintenanceScreen';
 import { MaintenanceCreateScreen } from './src/screens/MaintenanceCreateScreen';
+import { MaintenanceEditScreen } from './src/screens/MaintenanceEditScreen';
 
 function App(): React.JSX.Element {
   const [session, setSession] = useState<{ uid: number, user: string, pass: string } | null>(null);
 
   // Estado para saber en qué pantalla estamos: 'dashboard' | 'mantenimiento'
-  const [currentModule, setCurrentModule] = useState<'dashboard' | 'mantenimiento' | 'maintenance_create'>('dashboard');
+  const [currentModule, setCurrentModule] = useState<'dashboard' | 'mantenimiento' | 'maintenance_create' | 'maintenance_edit'>('dashboard');
+
+  //Id para editar
+  const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
 
   // Manejo de clics en el menú
   const handleModulePress = (moduleName: string) => {
@@ -47,7 +51,29 @@ function App(): React.JSX.Element {
     );
   }
 
-  // 3. Mantenimiento
+  // Pantalla para editar
+  if (currentModule === 'maintenance_edit' && selectedRequestId){
+    return (
+      <SafeAreaProvider>
+        <SafeAreaView style={{flex: 1, backgroundColor: '#EFF0F4'}}>
+          <MaintenanceEditScreen
+            session={session}
+            requestId={selectedRequestId} // Aquí el ID es obligatorio
+            onBack={() => {
+                setSelectedRequestId(null);
+                setCurrentModule('mantenimiento');
+            }}
+            onSuccess={() => {
+                setSelectedRequestId(null);
+                setCurrentModule('mantenimiento');
+            }}
+          />
+        </SafeAreaView>
+      </SafeAreaProvider>
+    );
+  } 
+
+  // 3. Mantenimiento listado
   if (currentModule === 'mantenimiento') {
     return (
       <SafeAreaProvider>
@@ -56,6 +82,10 @@ function App(): React.JSX.Element {
             session={session}
             onBack={() => setCurrentModule('dashboard')} // Volver al menú
             onCreate={() => setCurrentModule('maintenance_create')}
+            onEdit={(id) => {
+                setSelectedRequestId(id);
+                setCurrentModule('maintenance_edit');
+            }}
           />
         </SafeAreaView>
       </SafeAreaProvider>

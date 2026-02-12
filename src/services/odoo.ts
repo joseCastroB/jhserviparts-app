@@ -125,20 +125,40 @@ export const createMaintenanceRequest = async (
 };
 
 // 5. Obtener equipos de mantenimiento
-export const getEquipments = async (uid: number, password: string) => {
+export const getEquipments = async (uid: number, password: string, partnerId: number | null = null) => {
   try {
-    const teams = await rpcCall('object', 'execute_kw', [
-      ODOO_CONFIG.db,
-      uid,
-      password, 
+
+    const domain = partnerId ? [['partner_id', '=', partnerId]] : [];
+
+    const equipments = await rpcCall('object', 'execute_kw', [
+      ODOO_CONFIG.db, uid, password, 
       'maintenance.equipment',
       'search_read',
-      [],
-      { fields: ['id', 'name'], limit: 50},
+      [domain],
+      { fields: ['id', 'name', 'serial_no', 'partner_id'], limit: 50},
     ]);
-    return teams;
+    return equipments;
   } catch (error) {
-    console.error('Error getting teams:', error);
+    console.error('Error getting equipments:', error);
+    return [];
+  }
+};
+
+// Obtener clientes
+export const getPartners = async (uid: number, password: string) => {
+  try{
+    const partners = await rpcCall('object', 'execute_kw', [
+      ODOO_CONFIG.db, uid, password, 
+      'res.partner',
+      'search_read',
+      [],
+      { fields: ['id', 'name'], 
+        //limit: 50
+      },
+    ]);
+    return partners;
+  } catch (error){
+    console.error('Error getting partners:', error);
     return [];
   }
 };
@@ -159,5 +179,87 @@ export const getUsers = async (uid: number, password: string) => {
   } catch (error){
     console.error('Error getting users:', error);
     return [];
+  }
+};
+
+// 7. Obtener detalles de solicitud 
+export const getRequestDetails = async (uid: number, password: string, requestId: number) => {
+  try{
+    const data = await rpcCall('object', 'execute_kw', [
+      ODOO_CONFIG.db, uid, password,
+      'maintenance.request',
+      'read',
+      [[requestId]],
+      {
+        fields: [
+          'name', 'request_title', 
+          'partner_id', 'equipment_id', 'technician_id', // Relaciones
+          'maintenance_type', 'hour_type', 
+          'equipment_found_status', 'equipment_final_status', // Estados
+          'has_pending', 'pending_comments', 'service_rating', // Finales
+          'checklist_ids', // IDs del checklist
+          'description', 
+          'execution_start_date', 'execution_end_date',
+          'customer_signature', 'signed_by_customer', 'signed_by_technician', // Firmas
+          'evidence_ids' // Fotos
+        ]
+      }
+    ]);
+    return data && data.length > 0 ? data[0] : null;
+  } catch (error) {
+    console.error('Error details:', error);
+    return null;
+  }
+};
+
+// Obtener líneas de checklist
+export const getChecklistLines = async (uid: number, password: string, lineIds: number[]) => {
+  if (!lineIds || lineIds.length === 0) return [];
+  try {
+    const lines = await rpcCall('object', 'execute_kw', [
+      ODOO_CONFIG.db, uid, password,
+      'maintenance.checklist.line', // Tu modelo de líneas
+      'read',
+      [lineIds],
+      { fields: ['id', 'name', 'is_done'] }
+    ]);
+    return lines;
+  } catch (error) {
+    console.error('Error checklist:', error);
+    return [];
+  }
+};
+
+// 8. Obtener adjuntos (imagenes)
+export const getAttachments = async (uid: number, password: string, attachmentIds: number[]) => {
+  if(!attachmentIds || attachmentIds.length === 0) return [];
+  try{
+    const files = await rpcCall('object', 'execute_kw', [
+      ODOO_CONFIG.db, uid, password,
+      'ir.attachment',
+      'read',
+      [attachmentIds],
+      { fields : ['id', 'name', 'datas'] }     
+    ]);
+    return files;
+  } catch (error){
+    console.error('Error attachments:', error);
+    return [];
+  }
+};
+
+// 9. Actualizar solicitud
+export const updateMaintenanceRequest = async (uid: number, password: string, requestId: number, data: any) => {
+  try {
+    const result = await rpcCall('object', 'execute_kw', [
+      ODOO_CONFIG.db, uid, password, 
+      'maintenance.request',
+      'write',
+      [[requestId], data]
+    ]);
+    return result;
+  } catch (error) {
+    console.error('Error Update: ', error);
+    throw error;
   }
 };
