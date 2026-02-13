@@ -8,6 +8,10 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 import SignatureScreen from 'react-native-signature-canvas';
 
+// Librerías para PDF
+import RNFS from 'react-native-fs';
+import Share from 'react-native-share';
+
 // Servicios
 import { 
   updateMaintenanceRequest, 
@@ -16,7 +20,10 @@ import {
   getPartners,
   getRequestDetails,
   getAttachments,
-  getChecklistLines // <--- Asegúrate de haber agregado esta función en odoo.ts
+  getChecklistLines,
+  ODOO_SESSION_ID, 
+  ODOO_CONFIG,
+  authenticate
 } from '../services/odoo';
 
 interface EditProps {
@@ -26,7 +33,6 @@ interface EditProps {
   onSuccess: () => void;
 }
 
-// Interfaz para el checklist local (incluye ID si ya existe en Odoo)
 interface ChecklistItem {
   id?: number; 
   name: string;
@@ -49,40 +55,41 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
   const [pendingComments, setPendingComments] = useState('');
   const [serviceRating, setServiceRating] = useState<'good' | 'regular' | 'bad'>('good');
 
-  // Firmantes (Texto)
+  // Firmantes
   const [signedByCustomer, setSignedByCustomer] = useState('');
   const [signedByTechnician, setSignedByTechnician] = useState('');
 
-  // --- CHECKLIST (Complejo) ---
+  // Checklist
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [deletedChecklistIds, setDeletedChecklistIds] = useState<number[]>([]); // Para borrar líneas en Odoo
+  const [deletedChecklistIds, setDeletedChecklistIds] = useState<number[]>([]);
 
-  // --- FECHAS ---
+  // Fechas
   const [execStartDate, setExecStartDate] = useState<Date | null>(null);
   const [execEndDate, setExecEndDate] = useState<Date | null>(null);
 
-  // --- SELECCIONES ---
+  // Selecciones
   const [selectedPartnerId, setSelectedPartnerId] = useState<number | null>(null);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<number | null>(null);
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<number[]>([]);
 
-  // --- LISTAS ---
+  // Listas
   const [partners, setPartners] = useState<any[]>([]);
   const [equipments, setEquipments] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
 
-  // --- MULTIMEDIA ---
-  const [evidences, setEvidences] = useState<Asset[]>([]); // Nuevas fotos
-  const [existingEvidences, setExistingEvidences] = useState<any[]>([]); // Fotos viejas
-  const [deletedEvidenceIds, setDeletedEvidenceIds] = useState<number[]>([]); // Fotos viejas a borrar
+  // Multimedia
+  const [evidences, setEvidences] = useState<Asset[]>([]); 
+  const [existingEvidences, setExistingEvidences] = useState<any[]>([]); 
+  const [deletedEvidenceIds, setDeletedEvidenceIds] = useState<number[]>([]); 
 
   const [signature, setSignature] = useState<string | null>(null);
   const [isSignatureVisible, setIsSignatureVisible] = useState(false);
   const signatureRef = useRef<any>(null);
 
-  // --- UI ---
+  // UI
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [printing, setPrinting] = useState(false); // <--- ESTADO PARA CARGA DE PDF
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<'partner' | 'equipment' | 'user'>('equipment');
   const [loadingEquipments, setLoadingEquipments] = useState(false);
@@ -93,14 +100,10 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
   const [currentField, setCurrentField] = useState<'start' | 'end' | null>(null);
   const [tempDate, setTempDate] = useState<Date | null>(null);
 
-  // 1. CARGA DE DATOS (Edit Mode)
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     try {
-      // Cargar listas y detalles en paralelo
       const [partnersData, usersData, details] = await Promise.all([
         getPartners(session.uid, session.pass),
         getUsers(session.uid, session.pass),
@@ -111,55 +114,43 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
       setUsers(usersData);
 
       if (details) {
-        // Llenar campos simples
-        setSubject(details.request_title || ''); // Ojo: request_title
+        setSubject(details.request_title || '');
         if (details.maintenance_type) setType(details.maintenance_type);
         if (details.description) setDescription(details.description);
-        
         if (details.hour_type) setHourType(details.hour_type);
         if (details.equipment_found_status) setEquipmentStatus(details.equipment_found_status);
         if (details.equipment_final_status) setEquipmentFinalStatus(details.equipment_final_status);
         if (details.has_pending) setHasPending(details.has_pending);
         if (details.pending_comments) setPendingComments(details.pending_comments);
         if (details.service_rating) setServiceRating(details.service_rating);
-
         if (details.signed_by_customer) setSignedByCustomer(details.signed_by_customer);
         if (details.signed_by_technician) setSignedByTechnician(details.signed_by_technician);
 
-        // Relaciones (Odoo devuelve [id, "Nombre"])
         if (details.partner_id) {
             setSelectedPartnerId(details.partner_id[0]);
-            // Cargar equipos de este cliente
             const clientEquipments = await getEquipments(session.uid, session.pass, details.partner_id[0]);
             setEquipments(clientEquipments);
         } else {
-             // Si no hay cliente, cargar todos (o vacío)
              const all = await getEquipments(session.uid, session.pass, null);
              setEquipments(all);
         }
 
         if (details.equipment_id) setSelectedEquipmentId(details.equipment_id[0]);
-        if (details.technician_id) setSelectedTechnicianIds(details.technician_id); // Many2many devuelve array de IDs
+        if (details.technician_id) setSelectedTechnicianIds(details.technician_id);
 
-        // Fechas
         if (details.execution_start_date) setExecStartDate(new Date(details.execution_start_date.replace(' ', 'T')));
         if (details.execution_end_date) setExecEndDate(new Date(details.execution_end_date.replace(' ', 'T')));
 
-        // Firma
-        if (details.customer_signature) {
-            setSignature(`data:image/png;base64,${details.customer_signature}`);
-        }
+        if (details.customer_signature) setSignature(`data:image/png;base64,${details.customer_signature}`);
 
-        // Fotos Existentes
         if (details.evidence_ids && details.evidence_ids.length > 0) {
             const photos = await getAttachments(session.uid, session.pass, details.evidence_ids);
             setExistingEvidences(photos);
         }
 
-        // CHECKLIST (Cargar líneas)
         if (details.checklist_ids && details.checklist_ids.length > 0) {
             const lines = await getChecklistLines(session.uid, session.pass, details.checklist_ids);
-            setChecklist(lines); // Odoo devuelve [{id, name, is_done}, ...]
+            setChecklist(lines);
         }
       }
     } catch (e) {
@@ -171,44 +162,25 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
     }
   };
 
-  // 2. ACTUALIZAR (UPDATE)
   const handleUpdate = async () => {
     if (!subject.trim()) { Alert.alert('Error', 'El título es obligatorio.'); return; }
     setSaving(true);
 
     try {
-      // A. Fotos
-      // Nuevas: [0, 0, vals]
       const newEvidenceCommands = evidences.map((img) => [0, 0, {
           name: img.fileName || 'evidencia_edit.jpg', datas: img.base64, type: 'binary'
       }]);
-      // Borradas: [2, id, false]
       const deletedEvidenceCommands = deletedEvidenceIds.map(id => [2, id, false]);
-      // Combinar
       const allEvidenceCommands = [...newEvidenceCommands, ...deletedEvidenceCommands];
 
-      // B. Checklist (Lógica Create/Update/Delete)
       const checklistCommands: any[] = [];
-      
-      // 1. Modificados o Nuevos
       checklist.forEach(item => {
-          if (item.id) {
-              // Si tiene ID, es UPDATE: [1, id, vals]
-              checklistCommands.push([1, item.id, { name: item.name, is_done: item.is_done }]);
-          } else {
-              // Si NO tiene ID, es CREATE: [0, 0, vals]
-              checklistCommands.push([0, 0, { name: item.name, is_done: item.is_done }]);
-          }
+          if (item.id) checklistCommands.push([1, item.id, { name: item.name, is_done: item.is_done }]);
+          else checklistCommands.push([0, 0, { name: item.name, is_done: item.is_done }]);
       });
-      // 2. Borrados: [2, id, false]
-      deletedChecklistIds.forEach(id => {
-          checklistCommands.push([2, id, false]);
-      });
+      deletedChecklistIds.forEach(id => checklistCommands.push([2, id, false]));
 
-      // C. Firma
       const cleanSignature = signature && signature.includes('base64,') ? signature.split('base64,')[1] : (signature || false);
-
-      // D. Técnicos (Replace)
       const technicianCommand = [[6, 0, selectedTechnicianIds]];
 
       const dataToSend: any = {
@@ -216,27 +188,21 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
         partner_id: selectedPartnerId || false,
         equipment_id: selectedEquipmentId || false,
         technician_id: technicianCommand,
-        
         maintenance_type: type,
         hour_type: hourType,
         equipment_found_status: equipmentStatus,
         equipment_final_status: equipmentFinalStatus,
-        
         has_pending: hasPending,
         pending_comments: hasPending === 'yes' ? pendingComments : '',
         service_rating: serviceRating,
-
         signed_by_customer: signedByCustomer,
         signed_by_technician: signedByTechnician,
         description: description,
-
         execution_start_date: formatForOdoo(execStartDate),
         execution_end_date: formatForOdoo(execEndDate),
-        
         customer_signature: cleanSignature,
       };
 
-      // Solo enviar comandos si hay cambios (Odoo optimize)
       if (allEvidenceCommands.length > 0) dataToSend.evidence_ids = allEvidenceCommands;
       if (checklistCommands.length > 0) dataToSend.checklist_ids = checklistCommands;
 
@@ -244,14 +210,83 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
       Alert.alert('Éxito', 'Solicitud actualizada correctamente.', [{ text: 'OK', onPress: onSuccess }]);
 
     } catch (error) {
-      console.error(error);
       Alert.alert('Error', 'No se pudo actualizar.');
     } finally {
       setSaving(false);
     }
   };
 
-  // --- LOGICA CHECKLIST LOCAL ---
+  // --- LÓGICA DE IMPRESIÓN (PDF) ---
+  const handlePrint = async () => {
+    // 1. Validar Configuración
+    if (!ODOO_CONFIG?.url) {
+        Alert.alert('Error', 'Configuración de Odoo no cargada (URL faltante).');
+        return;
+    }
+
+    // 2. Validar Sesión
+    let currentSessionId = ODOO_SESSION_ID;
+    if (!currentSessionId) {
+        try {
+            console.log('🔄 Recuperando sesión...');
+            await authenticate(session.user, session.pass);
+            currentSessionId = ODOO_SESSION_ID; 
+        } catch (e) {
+            Alert.alert('Error', 'Sesión expirada. Por favor reloguearse.');
+            return;
+        }
+    }
+
+    setPrinting(true);
+    try {
+        const reportName = 'serviparts_mantenimiento.report_jh_template';
+        const url = `${ODOO_CONFIG.url}/report/pdf/${reportName}/${requestId}`;
+        
+        // CAMBIO IMPORTANTE: Usar CachesDirectoryPath en lugar de Documents
+        const filePath = `${RNFS.CachesDirectoryPath}/Reporte_${requestId}.pdf`;
+
+        console.log('📥 Intentando descargar:', url);
+        console.log('📂 Ruta destino:', filePath);
+
+        // 3. Descargar
+        const download = RNFS.downloadFile({
+            fromUrl: url,
+            toFile: filePath,
+            headers: {
+                'Cookie': `session_id=${currentSessionId}`
+            }
+        });
+
+        const result = await download.promise;
+
+        // 4. Verificar resultado
+        if (result.statusCode === 200) {
+            console.log('✅ Descarga completa. Abriendo Share...');
+            
+            // Verificar si el archivo realmente se creó
+            const exists = await RNFS.exists(filePath);
+            if (!exists) throw new Error('El archivo no se guardó correctamente.');
+
+            await Share.open({
+                url: `file://${filePath}`,
+                type: 'application/pdf',
+                title: `Reporte ${requestId}`,
+                failOnCancel: false // Evita error si el usuario cancela el share
+            });
+        } else {
+            console.log('❌ Error Status:', result.statusCode);
+            Alert.alert('Error de Servidor', `Odoo no devolvió el PDF. Código: ${result.statusCode}`);
+        }
+
+    } catch (error: any) {
+        console.error('❌ Error Crítico:', error);
+        Alert.alert('Fallo al Imprimir', error.message || 'Error desconocido');
+    } finally {
+        setPrinting(false);
+    }
+  };
+
+  // --- RESTO DE FUNCIONES (Igual que antes) ---
   const addChecklistItem = () => setChecklist([...checklist, { name: '', is_done: false }]);
   const updateChecklistItem = (index: number, text: string) => {
     const list = [...checklist]; list[index].name = text; setChecklist(list);
@@ -262,28 +297,19 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
   const removeChecklistItem = (index: number) => {
     const list = [...checklist];
     const item = list[index];
-    
-    // Si el item ya existía en Odoo (tiene ID), lo guardamos para borrarlo en el server
-    if (item.id) {
-        setDeletedChecklistIds([...deletedChecklistIds, item.id]);
-    }
-    
+    if (item.id) setDeletedChecklistIds([...deletedChecklistIds, item.id]);
     list.splice(index, 1);
     setChecklist(list);
   };
 
-  // --- LOGICA FOTOS ---
-  // Eliminar foto NUEVA (local)
   const removeNewEvidence = (index: number) => {
     const list = [...evidences]; list.splice(index, 1); setEvidences(list);
   };
-  // Eliminar foto VIEJA (server)
   const removeOldEvidence = (id: number) => {
-    setDeletedEvidenceIds([...deletedEvidenceIds, id]); // Marcar para borrar
-    setExistingEvidences(existingEvidences.filter(e => e.id !== id)); // Quitar de la vista
+    setDeletedEvidenceIds([...deletedEvidenceIds, id]); 
+    setExistingEvidences(existingEvidences.filter(e => e.id !== id)); 
   };
 
-  // --- SELECTORES Y UTILS ---
   const handlePartnerSelect = async (pid: number) => {
       setSelectedPartnerId(pid); setSelectedEquipmentId(null); setModalVisible(false);
       setLoadingEquipments(true);
@@ -297,7 +323,6 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
       else setSelectedTechnicianIds([...selectedTechnicianIds, id]);
   };
   
-  // Helpers estándar
   const requestCameraPermission = async () => { if(Platform.OS==='ios')return true; try{const g=await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA); return g===PermissionsAndroid.RESULTS.GRANTED;}catch(e){return false;} };
   const openCamera = async () => { if(await requestCameraPermission()){ const r=await launchCamera({mediaType:'photo',quality:0.5,includeBase64:true}); if(r.assets)setEvidences([...evidences,...r.assets]); } };
   const openGallery = async () => { const r=await launchImageLibrary({mediaType:'photo',quality:0.5,includeBase64:true}); if(r.assets)setEvidences([...evidences,...r.assets]); };
@@ -321,12 +346,25 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
 
   return (
     <View style={styles.container}>
+      {/* --- HEADER CON BOTONES --- */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}><Text style={styles.headerBtn}>Cancelar</Text></TouchableOpacity>
-        <Text style={styles.headerTitle}>Editar Solicitud</Text>
-        <TouchableOpacity onPress={handleUpdate} disabled={saving}>
-            {saving ? <ActivityIndicator color="white" /> : <Text style={styles.headerBtnBold}>ACTUALIZAR</Text>}
+        <TouchableOpacity onPress={onBack}>
+            <Text style={styles.headerBtn}>Cancelar</Text>
         </TouchableOpacity>
+        
+        <Text style={styles.headerTitle}>Editar</Text>
+        
+        <View style={{flexDirection: 'row'}}>
+            {/* BOTÓN IMPRIMIR */}
+            <TouchableOpacity onPress={handlePrint} disabled={printing || saving} style={{marginRight: 15}}>
+                {printing ? <ActivityIndicator color="white" /> : <Text style={styles.headerBtn}>🖨️ PDF</Text>}
+            </TouchableOpacity>
+
+            {/* BOTÓN GUARDAR */}
+            <TouchableOpacity onPress={handleUpdate} disabled={saving || printing}>
+                {saving ? <ActivityIndicator color="white" /> : <Text style={styles.headerBtnBold}>GUARDAR</Text>}
+            </TouchableOpacity>
+        </View>
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{flex:1}}>
@@ -335,14 +373,12 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
           <Text style={styles.label}>Título *</Text>
           <TextInput style={styles.inputLarge} value={subject} onChangeText={setSubject} />
 
-          {/* CLIENTE */}
           <Text style={styles.label}>Cliente</Text>
           <TouchableOpacity style={styles.selector} onPress={() => openSelector('partner')}>
             <Text style={styles.selectorText} numberOfLines={1}>{getSelectedName(partners, selectedPartnerId)}</Text>
             <Text style={{color:'#666'}}>▼</Text>
           </TouchableOpacity>
 
-          {/* MÁQUINA Y TÉCNICOS */}
           <View style={styles.row}>
             <View style={{flex: 1, marginRight: 5}}>
                 <Text style={styles.label}>Máquina</Text>
@@ -360,7 +396,6 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
             </View>
           </View>
 
-          {/* TIPO HORA */}
           <Text style={styles.label}>Tipo de Hora</Text>
           <View style={styles.typeContainer}>
             {['operational', 'snack', 'transfer'].map((t) => (
@@ -370,7 +405,6 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
             ))}
           </View>
 
-          {/* FECHAS */}
           <Text style={styles.label}>Fechas y Hora</Text>
           <View style={styles.row}>
              <View style={{flex: 1, marginRight: 5}}>
@@ -383,7 +417,6 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
              </View>
           </View>
 
-          {/* ESTADO INICIAL */}
           <Text style={styles.label}>¿Cómo encontró el equipo?</Text>
           <View style={styles.typeContainer}>
             <TouchableOpacity style={[styles.typeBtn, equipmentStatus === 'operative' && styles.typeBtnActive]} onPress={() => setEquipmentStatus('operative')}>
@@ -394,7 +427,6 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
             </TouchableOpacity>
           </View>
 
-          {/* CHECKLIST */}
           <Text style={styles.label}>Descripción del Servicio</Text>
           <View style={styles.cardSection}>
              {checklist.map((item, index) => (
@@ -409,7 +441,6 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
              <TouchableOpacity style={styles.addChecklistBtn} onPress={addChecklistItem}><Text style={styles.addChecklistText}>+ Agregar Tarea</Text></TouchableOpacity>
           </View>
 
-          {/* ESTADO FINAL */}
           <Text style={styles.label}>¿Cómo se deja el equipo?</Text>
           <View style={styles.typeContainer}>
             <TouchableOpacity style={[styles.typeBtn, equipmentFinalStatus === 'operative' && styles.typeBtnActive]} onPress={() => setEquipmentFinalStatus('operative')}>
@@ -420,7 +451,6 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
             </TouchableOpacity>
           </View>
 
-          {/* PENDIENTES */}
           <Text style={styles.label}>¿Encontró pendientes?</Text>
           <View style={styles.typeContainer}>
             <TouchableOpacity style={[styles.typeBtn, hasPending === 'yes' && styles.typeBtnActive]} onPress={() => setHasPending('yes')}>
@@ -440,19 +470,15 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
           <Text style={styles.label}>Notas Adicionales</Text>
           <TextInput style={[styles.input, {height:60}]} multiline value={description} onChangeText={setDescription} placeholder="Observaciones..."/>
 
-          {/* FOTOS */}
           <Text style={styles.sectionHeader}>Fotos</Text>
           <View style={styles.cardSection}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {/* Antiguas */}
                 {existingEvidences.map((img) => (
                     <View key={`old-${img.id}`} style={styles.evidenceItem}>
                         <Image source={{ uri: `data:image/jpeg;base64,${img.datas}` }} style={[styles.evidenceImage, {opacity: 0.7}]} />
-                        {/* Botón borrar foto vieja */}
                         <TouchableOpacity style={styles.removeBtn} onPress={() => removeOldEvidence(img.id)}><Text style={styles.removeBtnText}>X</Text></TouchableOpacity>
                     </View>
                 ))}
-                {/* Nuevas */}
                 {evidences.map((img, i) => (
                     <View key={`new-${i}`} style={styles.evidenceItem}>
                         <Image source={{ uri: img.uri }} style={styles.evidenceImage} />
@@ -463,7 +489,6 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
             </ScrollView>
           </View>
 
-          {/* CALIFICACIÓN */}
           <Text style={styles.sectionHeader}>Calificación</Text>
           <View style={styles.typeContainer}>
              {['good', 'regular', 'bad'].map(r => (
@@ -473,7 +498,6 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
              ))}
           </View>
 
-          {/* FIRMANTES */}
           <Text style={styles.label}>Firmado por</Text>
           <View style={styles.row}>
              <View style={{flex: 1, marginRight: 5}}>
@@ -486,7 +510,6 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
              </View>
           </View>
 
-          {/* FIRMA */}
           <Text style={styles.sectionHeader}>Firma del Cliente</Text>
           <View style={styles.cardSection}>
             {signature ? (
@@ -499,7 +522,6 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
             )}
           </View>
 
-          {/* TIPO MANT */}
           <Text style={styles.label}>Tipo de Mantenimiento</Text>
           <View style={styles.typeContainer}>
             <TouchableOpacity style={[styles.typeBtn, type === 'corrective' && styles.typeBtnActive]} onPress={() => setType('corrective')}>
@@ -606,7 +628,6 @@ const styles = StyleSheet.create({
   modalItemText: { fontSize: 16, color: '#333' },
   closeModalBtn: { marginTop: 20, alignItems: 'center', padding: 10, backgroundColor: '#eee', borderRadius: 5 },
   closeModalText: { color: 'red', fontWeight: 'bold' },
-  // Checklist Styles
   checklistItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   checkboxContainer: { marginRight: 10 },
   checkbox: { width: 24, height: 24, borderWidth: 2, borderColor: '#318F9A', borderRadius: 4, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' },

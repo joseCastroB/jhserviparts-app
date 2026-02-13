@@ -5,6 +5,9 @@ export const ODOO_CONFIG = {
     db: 'jh-serviparts',
 };
 
+// Variable Global para guardar la sesión
+export let ODOO_SESSION_ID = '';
+
 // Función genérica para hacer peticiones JSON-RPC (Versión Robusta)
 const rpcCall = async (service: string, method: string, args: any[]) => {
   try {
@@ -13,6 +16,9 @@ const rpcCall = async (service: string, method: string, args: any[]) => {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        // Si tenemos sesión, la enviamos (útil para futuras llamadas)
+        ...(ODOO_SESSION_ID ? { 'Cookie': `session_id=${ODOO_SESSION_ID}` } : {})
+        
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
@@ -40,21 +46,67 @@ const rpcCall = async (service: string, method: string, args: any[]) => {
   }
 };
 
-// 1. Autenticación
+// 1. Autenticación (CAMBIADO A /web/session/authenticate PARA ASEGURAR COOKIE)
 export const authenticate = async (username: string, password: string): Promise<number> => {
   try {
-    const uid = await rpcCall('common', 'authenticate', [
-      ODOO_CONFIG.db,
-      username,
-      password,    
-      {},
-    ]);
+    console.log('Intentando login en:', `${ODOO_CONFIG.url}/web/session/authenticate`);
+    
+    // Usamos el endpoint Web que garantiza la cookie de sesión
+    const response = await fetch(`${ODOO_CONFIG.url}/web/session/authenticate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'call',
+        params: {
+          db: ODOO_CONFIG.db,
+          login: username,
+          password: password,
+        },
+        id: 1,
+      }),
+    });
 
-    if (!uid) {
-      throw new Error('Usuario o contraseña incorrectos');
+    // --- CAPTURA DE COOKIE (BLINDADA) ---
+    const headers = response.headers;
+    // Intentamos obtener el header de varias formas (React Native a veces lo esconde)
+    let cookieHeader = headers.get('set-cookie') || headers.get('Set-Cookie');
+    
+    // Hack para Android: a veces los headers están dentro de un mapa 'map'
+    if (!cookieHeader && (headers as any).map) {
+        cookieHeader = (headers as any).map['set-cookie'] || (headers as any).map['Set-Cookie'];
     }
 
-    console.log('✅ Conectado a Odoo! UID:', uid);
+    if (cookieHeader) {
+        // Convertimos a string y buscamos el session_id
+        const strCookie = String(cookieHeader);
+        const match = strCookie.match(/session_id=([^;]+)/);
+        if (match && match[1]) {
+            ODOO_SESSION_ID = match[1];
+            console.log('✅ Cookie Capturada:', ODOO_SESSION_ID);
+        }
+    }
+
+    const json = await response.json();
+
+    if (json.error) {
+      throw new Error(json.error.data?.message || 'Error de credenciales');
+    }
+
+    // Este endpoint devuelve un objeto de sesión completo. El UID está dentro.
+    const uid = json.result.uid;
+
+    if (!uid) throw new Error('Usuario o contraseña incorrectos');
+    
+    // Respaldo: Si la cookie no vino en el header (raro), a veces Odoo la devuelve en el body
+    if (!ODOO_SESSION_ID && json.result.session_id) {
+        ODOO_SESSION_ID = json.result.session_id;
+        console.log('✅ Cookie recuperada del body:', ODOO_SESSION_ID);
+    }
+
     return uid;
   } catch (error) {
     console.error('Error Auth:', error);

@@ -1,9 +1,22 @@
 // src/screens/LoginScreen.tsx
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableWithoutFeedback, Keyboard, Image } from 'react-native';
+import { 
+    View, 
+    Text, 
+    TextInput, 
+    StyleSheet, 
+    ActivityIndicator, 
+    Alert, 
+    KeyboardAvoidingView, 
+    Platform, 
+    ScrollView, 
+    TouchableWithoutFeedback, 
+    Keyboard, 
+    Image, 
+    TouchableOpacity 
+} from 'react-native';
 import { authenticate } from '../services/odoo';
 
-// Definimos las "props" que recibirá esta pantalla"
 interface LoginProps {
     onLoginSuccess: (uid: number, username: string, password: string) => void;
 }
@@ -21,12 +34,8 @@ export const LoginScreen = ({ onLoginSuccess }: LoginProps) => {
 
         setLoading(true);
         try {
-            // Llamamos al servicio con los datos REALES del formulario
             const uid = await authenticate(email, password);
-
-            // Si pasa, avisamos a App.tsx que guarde los datos
             onLoginSuccess(uid, email, password);
-
         } catch (error: any) {
             Alert.alert('Login Fallido', error.message || 'Verifica tus credenciales');
         } finally {
@@ -35,20 +44,38 @@ export const LoginScreen = ({ onLoginSuccess }: LoginProps) => {
     };
 
     return (
-
         <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.container}
+            // CAMBIO 1: Ajuste de comportamiento para Android vs iOS
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.mainContainer}
+            // CAMBIO 2: Offset para asegurar que no quede pegado al borde
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <ScrollView contentContainerStyle={styles.scrollContainer}>
-                    <View style={styles.container}>
+                <ScrollView 
+                    contentContainerStyle={styles.scrollContainer}
+                    showsVerticalScrollIndicator={false}
+                    // CAMBIO 3: Importante para que el botón funcione con el teclado abierto
+                    keyboardShouldPersistTaps="handled"
+                >
+                    <View style={styles.formContainer}>
+                        
+                        {/* LOGO DE LA EMPRESA */}
+                        <View style={styles.logoContainer}>
+                            <Image 
+                                source={require('../assets/jh-serviparts-logo.png')}
+                                style={styles.logo}
+                                resizeMode="contain"
+                            />
+                        </View>
+
                         <Text style={styles.title}>Bienvenido a JH SERVIPARTS SAC</Text>
 
                         <Text style={styles.label}>Usuario / Email</Text>
                         <TextInput
                             style={styles.input}
                             placeholder="ejemplo@correo.com"
+                            placeholderTextColor="#999"
                             value={email}
                             onChangeText={setEmail}
                             autoCapitalize="none"
@@ -59,16 +86,22 @@ export const LoginScreen = ({ onLoginSuccess }: LoginProps) => {
                         <TextInput
                             style={styles.input}
                             placeholder="********"
+                            placeholderTextColor="#999"
                             value={password}
                             onChangeText={setPassword}
                             secureTextEntry
                         />
 
-                        {loading ? (
-                            <ActivityIndicator size="large" color="#0000ff" />
-                        ) : (
-                            <Button title="Ingresar" onPress={handleLogin} />
-                        )}
+                        <View style={styles.buttonContainer}>
+                            {loading ? (
+                                <ActivityIndicator size="large" color="#F57C00" />
+                            ) : (
+                                /* Botón personalizado Naranja */
+                                <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+                                    <Text style={styles.loginButtonText}>INGRESAR</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
                     </View>
                 </ScrollView>
             </TouchableWithoutFeedback>
@@ -77,20 +110,68 @@ export const LoginScreen = ({ onLoginSuccess }: LoginProps) => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#f5f5f5' },
-    scrollContainer: { flexGrow: 1, paddingTop: 60, paddingBottom: 200, 
+    mainContainer: { 
+        flex: 1, 
+        backgroundColor: '#f5f5f5' 
     },
-    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 30, textAlign: 'center', color: '#333' },
-    label: { fontSize: 16, marginBottom: 5, color: '#333' },
+    scrollContainer: { 
+        flexGrow: 1, 
+        justifyContent: 'center' 
+    },
+    formContainer: { 
+        padding: 20, 
+        justifyContent: 'center' 
+    },
+    logoContainer: {
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    logo: {
+        width: 150,  // Ajusta este tamaño según tu imagen
+        height: 150, 
+    },
+    title: { 
+        fontSize: 22, 
+        fontWeight: 'bold', 
+        marginBottom: 30, 
+        textAlign: 'center', 
+        color: '#2E7D32', // Verde corporativo (Título)
+    },
+    label: { 
+        fontSize: 16, 
+        marginBottom: 8, 
+        fontWeight: '600',
+        color: '#2E7D32' // Verde corporativo (Labels)
+    },
     input: {
         backgroundColor: 'white',
         borderWidth: 1,
-        borderColor: '#ddd',
-        padding: 10,
+        borderColor: '#2E7D32', // Borde verde suave
+        padding: 12,
         borderRadius: 8,
         marginBottom: 20,
         fontSize: 16,
         color: '#000',
-        elevation: 2, //Pequeña sombra
+        elevation: 2,
     },
+    buttonContainer: {
+        marginTop: 10,
+    },
+    loginButton: {
+        backgroundColor: '#F57C00', // Naranja corporativo
+        paddingVertical: 15,
+        borderRadius: 10,
+        alignItems: 'center',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+    },
+    loginButtonText: {
+        color: 'white',
+        fontSize: 18,
+        fontWeight: 'bold',
+        letterSpacing: 1,
+    }
 });

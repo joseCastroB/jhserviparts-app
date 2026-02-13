@@ -14,12 +14,7 @@ interface ModuleItem {
 
 // Datos simulados (Aquí irás agregando tus otros módulos)
 const MODULES: ModuleItem[] = [
-    { id: '1', name: 'Conversaciones', color: '#F06050'},
-    { id: '2', name: 'Calendario', color: '#F29648'},
     { id: '3', name: 'Mantenimiento', icon: require('../assets/logo_mantenimiento.png'), color: '#318F9A' },
-    { id: '4', name: 'Contactos', color: '#315C99'},
-    { id: '5', name: 'Inventario', color: '#7C3446'},
-    { id: '6', name: 'Ajustes', color: '#666666'},
 ];
 
 interface DashboardProps {
