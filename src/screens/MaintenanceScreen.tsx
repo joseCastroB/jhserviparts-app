@@ -40,6 +40,8 @@ export const MaintenanceScreen = ({ session, onBack, onCreate, onEdit }: Mainten
     const title = item.request_title ? item.request_title.toLowerCase() : ''; // Buscamos también por título
     const stage = Array.isArray(item.stage_id) ? item.stage_id[1].toLowerCase() : '';
     
+    const client = Array.isArray(item.partner_id) ? item.partner_id[1].toLowerCase() : '';
+
     // Filtro: Nombre (Código) O Título O Estado
     return name.includes(searchText) || title.includes(searchText) || stage.includes(searchText);
   });
@@ -60,6 +62,11 @@ export const MaintenanceScreen = ({ session, onBack, onCreate, onEdit }: Mainten
           {/* --- NUEVO: TÍTULO DE LA SOLICITUD --- */}
           <Text style={styles.cardSubtitle} numberOfLines={2}>
             {item.request_title || 'Sin descripción'}
+          </Text>
+
+            {/* --- NUEVO: CLIENTE --- */}
+          <Text style={styles.clientText} numberOfLines={1}>
+            👤 {Array.isArray(item.partner_id) ? item.partner_id[1] : 'Sin cliente asignado'}
           </Text>
 
           {/* Fecha */}
@@ -154,6 +161,8 @@ const styles = StyleSheet.create({
   // Estilo nuevo para el subtítulo
   cardSubtitle: { fontSize: 15, color: '#555', marginBottom: 8, fontWeight: '500' },
   
+  clientText: { fontSize: 14, color: '#318F9A', fontWeight: '600', marginBottom: 8 },
+
   dateText: { color: '#999', fontSize: 12 },
   badge: { backgroundColor: '#e0e0e0', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
   badgeText: { fontSize: 12, color: '#333' }

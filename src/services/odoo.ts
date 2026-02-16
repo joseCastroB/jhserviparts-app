@@ -145,7 +145,8 @@ export const getMaintenanceRequests = async (uid: number, password: string) => {
             'name', 
             'request_title', 
             'stage_id', 
-            'request_date'
+            'request_date',
+            'partner_id'
         ], 
         order: 'id desc' // Sin limit
       }
