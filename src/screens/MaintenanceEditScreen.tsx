@@ -49,6 +49,10 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
   const [hourType, setHourType] = useState<'operational' | 'snack' | 'transfer'>('operational');
   const [equipmentStatus, setEquipmentStatus] = useState<'operative' | 'inoperative'>('operative');
 
+  // --- NUEVO: HORÓMETRO (Horas y Minutos) ---
+  const [horometerHours, setHorometerHours] = useState('');
+  const [horometerMinutes, setHorometerMinutes] = useState('');
+
   // Estados Finales
   const [equipmentFinalStatus, setEquipmentFinalStatus] = useState<'operative' | 'inoperative'>('operative');
   const [hasPending, setHasPending] = useState<'yes' | 'no'>('no');
@@ -89,7 +93,7 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
   // UI
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [printing, setPrinting] = useState(false); // <--- ESTADO PARA CARGA DE PDF
+  const [printing, setPrinting] = useState(false); 
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState<'partner' | 'equipment' | 'user'>('equipment');
   const [loadingEquipments, setLoadingEquipments] = useState(false);
@@ -125,6 +129,16 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
         if (details.service_rating) setServiceRating(details.service_rating);
         if (details.signed_by_customer) setSignedByCustomer(details.signed_by_customer);
         if (details.signed_by_technician) setSignedByTechnician(details.signed_by_technician);
+
+        // --- NUEVO: Extraer Horómetro de Odoo (float) a Horas y Minutos ---
+        if (typeof details.horometer_execution === 'number') {
+            const h = Math.floor(details.horometer_execution);
+            const m = Math.round((details.horometer_execution - h) * 60);
+            if (h > 0 || m > 0) {
+                setHorometerHours(h.toString());
+                setHorometerMinutes(m.toString());
+            }
+        }
 
         if (details.partner_id) {
             setSelectedPartnerId(details.partner_id[0]);
@@ -183,6 +197,11 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
       const cleanSignature = signature && signature.includes('base64,') ? signature.split('base64,')[1] : (signature || false);
       const technicianCommand = [[6, 0, selectedTechnicianIds]];
 
+      // --- NUEVO: Convertir Horas y Minutos a Float para enviar a Odoo ---
+      const h = parseFloat(horometerHours) || 0;
+      const m = parseFloat(horometerMinutes) || 0;
+      const finalHorometerFloat = h + (m / 60);
+
       const dataToSend: any = {
         request_title: subject,
         partner_id: selectedPartnerId || false,
@@ -191,6 +210,10 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
         maintenance_type: type,
         hour_type: hourType,
         equipment_found_status: equipmentStatus,
+        
+        // --- HORÓMETRO ---
+        horometer_execution: finalHorometerFloat,
+
         equipment_final_status: equipmentFinalStatus,
         has_pending: hasPending,
         pending_comments: hasPending === 'yes' ? pendingComments : '',
@@ -218,75 +241,44 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
 
   // --- LÓGICA DE IMPRESIÓN (PDF) ---
   const handlePrint = async () => {
-    // 1. Validar Configuración
-    if (!ODOO_CONFIG?.url) {
-        Alert.alert('Error', 'Configuración de Odoo no cargada (URL faltante).');
-        return;
-    }
+    if (!ODOO_CONFIG?.url) { Alert.alert('Error', 'Configuración de Odoo no cargada.'); return; }
 
-    // 2. Validar Sesión
     let currentSessionId = ODOO_SESSION_ID;
     if (!currentSessionId) {
         try {
-            console.log('🔄 Recuperando sesión...');
             await authenticate(session.user, session.pass);
             currentSessionId = ODOO_SESSION_ID; 
-        } catch (e) {
-            Alert.alert('Error', 'Sesión expirada. Por favor reloguearse.');
-            return;
-        }
+        } catch (e) { Alert.alert('Error', 'Sesión expirada.'); return; }
     }
 
     setPrinting(true);
     try {
         const reportName = 'serviparts_mantenimiento.report_jh_template';
         const url = `${ODOO_CONFIG.url}/report/pdf/${reportName}/${requestId}`;
-        
-        // CAMBIO IMPORTANTE: Usar CachesDirectoryPath en lugar de Documents
         const filePath = `${RNFS.CachesDirectoryPath}/Reporte_${requestId}.pdf`;
 
-        console.log('📥 Intentando descargar:', url);
-        console.log('📂 Ruta destino:', filePath);
-
-        // 3. Descargar
         const download = RNFS.downloadFile({
-            fromUrl: url,
-            toFile: filePath,
-            headers: {
-                'Cookie': `session_id=${currentSessionId}`
-            }
+            fromUrl: url, toFile: filePath,
+            headers: { 'Cookie': `session_id=${currentSessionId}` }
         });
 
         const result = await download.promise;
 
-        // 4. Verificar resultado
         if (result.statusCode === 200) {
-            console.log('✅ Descarga completa. Abriendo Share...');
-            
-            // Verificar si el archivo realmente se creó
             const exists = await RNFS.exists(filePath);
             if (!exists) throw new Error('El archivo no se guardó correctamente.');
 
             await Share.open({
-                url: `file://${filePath}`,
-                type: 'application/pdf',
-                title: `Reporte ${requestId}`,
-                failOnCancel: false // Evita error si el usuario cancela el share
+                url: `file://${filePath}`, type: 'application/pdf', title: `Reporte ${requestId}`, failOnCancel: false 
             });
         } else {
-            console.log('❌ Error Status:', result.statusCode);
-            Alert.alert('Error de Servidor', `Odoo no devolvió el PDF. Código: ${result.statusCode}`);
+            Alert.alert('Error', `Odoo no devolvió el PDF. Código: ${result.statusCode}`);
         }
-
-    } catch (error: any) {
-        console.error('❌ Error Crítico:', error);
-        Alert.alert('Fallo al Imprimir', error.message || 'Error desconocido');
-    } finally {
-        setPrinting(false);
-    }
+    } catch (error: any) { Alert.alert('Fallo', error.message || 'Error desconocido'); } 
+    finally { setPrinting(false); }
   };
 
-  // --- RESTO DE FUNCIONES (Igual que antes) ---
+  // --- RESTO DE FUNCIONES ---
   const addChecklistItem = () => setChecklist([...checklist, { name: '', is_done: false }]);
   const updateChecklistItem = (index: number, text: string) => {
     const list = [...checklist]; list[index].name = text; setChecklist(list);
@@ -346,21 +338,13 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
 
   return (
     <View style={styles.container}>
-      {/* --- HEADER CON BOTONES --- */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
-            <Text style={styles.headerBtn}>Cancelar</Text>
-        </TouchableOpacity>
-        
+        <TouchableOpacity onPress={onBack}><Text style={styles.headerBtn}>Cancelar</Text></TouchableOpacity>
         <Text style={styles.headerTitle}>Editar</Text>
-        
         <View style={{flexDirection: 'row'}}>
-            {/* BOTÓN IMPRIMIR */}
             <TouchableOpacity onPress={handlePrint} disabled={printing || saving} style={{marginRight: 15}}>
                 {printing ? <ActivityIndicator color="white" /> : <Text style={styles.headerBtn}>🖨️ PDF</Text>}
             </TouchableOpacity>
-
-            {/* BOTÓN GUARDAR */}
             <TouchableOpacity onPress={handleUpdate} disabled={saving || printing}>
                 {saving ? <ActivityIndicator color="white" /> : <Text style={styles.headerBtnBold}>GUARDAR</Text>}
             </TouchableOpacity>
@@ -394,6 +378,37 @@ export const MaintenanceEditScreen = ({ session, requestId, onBack, onSuccess }:
                     </Text>
                 </TouchableOpacity>
             </View>
+          </View>
+
+          {/* --- NUEVO: HORÓMETRO EN LA VISTA DE EDICIÓN --- */}
+          <Text style={styles.label}>Horómetro</Text>
+          <View style={styles.row}>
+             <View style={{flex: 1, marginRight: 5}}>
+                 <Text style={styles.labelSmall}>Horas</Text>
+                 <TextInput 
+                     style={styles.input} 
+                     value={horometerHours} 
+                     onChangeText={setHorometerHours} 
+                     placeholder="Ej: 1500" 
+                     keyboardType="numeric" 
+                 />
+             </View>
+             <View style={{flex: 1, marginLeft: 5}}>
+                 <Text style={styles.labelSmall}>Minutos</Text>
+                 <TextInput 
+                     style={styles.input} 
+                     value={horometerMinutes} 
+                     onChangeText={(text) => {
+                         const val = parseInt(text);
+                         if (text === '' || (val >= 0 && val <= 59)) {
+                             setHorometerMinutes(text);
+                         }
+                     }} 
+                     placeholder="0 - 59" 
+                     keyboardType="numeric"
+                     maxLength={2} 
+                 />
+             </View>
           </View>
 
           <Text style={styles.label}>Tipo de Hora</Text>

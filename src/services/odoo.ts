@@ -263,6 +263,7 @@ export const getRequestDetails = async (uid: number, password: string, requestId
           'equipment_found_status', 'equipment_final_status', 
           'has_pending', 'pending_comments', 'service_rating', 
           'checklist_ids',
+          'horometer_execution',
           'description', 
           'execution_start_date', 'execution_end_date',
           'customer_signature', 'signed_by_customer', 'signed_by_technician',

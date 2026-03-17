@@ -32,6 +32,10 @@ export const MaintenanceCreateScreen = ({ session, onBack, onSuccess }: CreatePr
   const [hourType, setHourType] = useState<'operational' | 'snack' | 'transfer'>('operational');
   const [equipmentStatus, setEquipmentStatus] = useState<'operative' | 'inoperative'>('operative');
   
+  // --- NUEVO: HORÓMETRO (Horas y Minutos) ---
+  const [horometerHours, setHorometerHours] = useState('');
+  const [horometerMinutes, setHorometerMinutes] = useState('');
+
   // --- NUEVOS CAMPOS (Final y Pendientes) ---
   const [equipmentFinalStatus, setEquipmentFinalStatus] = useState<'operative' | 'inoperative'>('operative');
   const [hasPending, setHasPending] = useState<'yes' | 'no'>('no');
@@ -150,6 +154,11 @@ export const MaintenanceCreateScreen = ({ session, onBack, onSuccess }: CreatePr
       const technicianCommand = [[6, 0, selectedTechnicianIds]];
       const checklistCommands = checklist.map(item => [0, 0, { name: item.name, is_done: item.is_done }]);
 
+      // CÁLCULO DEL HORÓMETRO (Para Odoo float_time)
+      const h = parseFloat(horometerHours) || 0;
+      const m = parseFloat(horometerMinutes) || 0;
+      const finalHorometerFloat = h + (m / 60);
+
       const dataToSend: any = {
         request_title: subject,
         partner_id: selectedPartnerId || false,
@@ -160,10 +169,13 @@ export const MaintenanceCreateScreen = ({ session, onBack, onSuccess }: CreatePr
         hour_type: hourType,
         equipment_found_status: equipmentStatus,
         
+        // --- NUEVO: HORÓMETRO CALCULADO ---
+        horometer_execution: finalHorometerFloat,
+        
         // NUEVOS CAMPOS
         equipment_final_status: equipmentFinalStatus,
         has_pending: hasPending,
-        pending_comments: hasPending === 'yes' ? pendingComments : '', // Solo enviamos comentario si hay pendientes
+        pending_comments: hasPending === 'yes' ? pendingComments : '', 
         
         // Calificacion
         service_rating: serviceRating,
@@ -269,6 +281,38 @@ export const MaintenanceCreateScreen = ({ session, onBack, onSuccess }: CreatePr
                     </Text>
                 </TouchableOpacity>
             </View>
+          </View>
+
+          {/* --- NUEVO: HORÓMETRO CON HORAS Y MINUTOS --- */}
+          <Text style={styles.label}>Horómetro</Text>
+          <View style={styles.row}>
+             <View style={{flex: 1, marginRight: 5}}>
+                 <Text style={styles.labelSmall}>Horas</Text>
+                 <TextInput 
+                     style={styles.input} 
+                     value={horometerHours} 
+                     onChangeText={setHorometerHours} 
+                     placeholder="Ej: 1500" 
+                     keyboardType="numeric" 
+                 />
+             </View>
+             <View style={{flex: 1, marginLeft: 5}}>
+                 <Text style={styles.labelSmall}>Minutos</Text>
+                 <TextInput 
+                     style={styles.input} 
+                     value={horometerMinutes} 
+                     onChangeText={(text) => {
+                         const val = parseInt(text);
+                         // Solo permite borrar o números entre 0 y 59
+                         if (text === '' || (val >= 0 && val <= 59)) {
+                             setHorometerMinutes(text);
+                         }
+                     }} 
+                     placeholder="0 - 59" 
+                     keyboardType="numeric"
+                     maxLength={2} 
+                 />
+             </View>
           </View>
 
           {/* TIPO DE HORA */}
